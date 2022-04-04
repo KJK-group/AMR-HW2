@@ -1,0 +1,11 @@
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 100
+PointerAlignment: Left
+
+DerivePointerAlignment: false
+# AlignConsecutiveAssignments: Consecutive
+AlignTrailingComments: true
+
+# AlignOperands:  AlignAfterOperator
+# AllowShortEnumsOnASingleLine: false
