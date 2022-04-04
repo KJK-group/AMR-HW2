@@ -8,8 +8,8 @@ MAKEFLAGS += --no-silent
 
 default: build
 
-src_files  := $(wildcard src/*.cpp)
-header_files  := $(wildcard include/*.hpp)
+src_files  := $(wildcard src/**/*.cpp)
+header_files  := $(wildcard include/**/*.hpp)
 
 build: ${src_files} ${header_files}
 	catkin bt
@@ -17,11 +17,13 @@ build: ${src_files} ${header_files}
 format: clang-format
 
 clang-format:
-	git ls-files -- '*.cpp' '*.h' '*.hpp' | xargs clang-format -i -style=./.clang-format
+#	git ls-files -- '*.cpp' '*.h' '*.hpp' | xargs clang-format -i -style=./.clang-format
+	git ls-files -- '*.cpp' '*.h' '*.hpp' | xargs clang-format -i
 
 lint: clang-tidy shellharden
 
 clang-tidy:
+	git ls-files -- '*.cpp' '*.h' '*.hpp' | xargs clang-tidy
 
 shellharden:
 	git ls-files -- '*.sh' '*.bash' | xargs shellharden
