@@ -28,3 +28,5 @@ function(add_ros_executable name main)
 endfunction(add_ros_executable)
 
 add_ros_executable(crane_pose_publisher src/crane_pose_publisher.cpp)
+add_ros_executable(map_to_inspection_tf_broadcaster
+                   src/map_to_inspection_tf_broadcaster.cpp)

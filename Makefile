@@ -28,4 +28,7 @@ clang-tidy:
 shellharden:
 	git ls-files -- '*.sh' '*.bash' | xargs shellharden
 
-.PHONY: default build format clang-format clang-tidy lint shellharden
+dev-setup:
+	./scripts/dev-setup.sh
+
+.PHONY: default build format clang-format clang-tidy lint shellharden dev-setup
