@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+	<arg name="package" value="amr_hw2" />
+	<arg name="package_path" value="$(find amr_hw2)" />
+
+	<node pkg="$(arg package)" type="crane_pose_publisher" name="crane_pose_publisher" output="screen" />
+	<node pkg="$(arg package)" type="map_to_inspection_tf_broadcaster" name="map_to_inspection_tf_broadcaster" output="screen" />
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(find amr_hw2)/rviz/task-1.rviz" />
+
+</launch>
