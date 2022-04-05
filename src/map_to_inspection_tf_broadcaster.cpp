@@ -17,8 +17,7 @@ auto crane_pose_cb(const geometry_msgs::PoseStamped::ConstPtr& msg) -> void {
     tf.transform.translation.y = position.y;
     tf.transform.translation.z = position.z;
 
-    const auto& quat = msg->pose.orientation;
-    tf.transform.rotation.x = quat.x;
+    const auto& quat = msg->pose.orientation;    tf.transform.rotation.x = quat.x;
     tf.transform.rotation.y = quat.y;
     tf.transform.rotation.z = quat.z;
     tf.transform.rotation.w = quat.w;

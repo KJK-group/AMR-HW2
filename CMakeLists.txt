@@ -20,6 +20,9 @@ find_package(Eigen3 REQUIRED)
 include_directories(${CMAKE_SOURCE_DIR}/include ${catkin_INCLUDE_DIRS}
                     ${Eigen3_INCLUDE_DIRS})
 
+# this needs to be here for rosrun and roslaunch
+catkin_package()
+
 function(add_ros_executable name main)
   add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${main})
   add_dependencies(${name} ${${PROJECT_NAME}_EXPORTED_TARGETS}
