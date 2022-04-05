@@ -33,7 +33,7 @@ using std::string;
 using std::vector;
 
 // state enumeration
-enum state { PASSIVE, HOVER, WAYPOINT_NAVIGATION, LAND };
+enum state { PASSIVE, HOVER, INSPECTION, LAND };
 auto state = state.PASSIVE;
 
 // publishers
@@ -46,6 +46,7 @@ ros::Subscriber sub_odom;
 // services
 ros::ServiceClient client_arm;
 ros::ServiceClient client_mode;
+ros::ServiceClient client_land;
 
 // state variables
 mavros_msgs::State drone_state;
@@ -69,20 +70,26 @@ auto inspection_waypoints =
     vector<Vector3f>{{2, 2, 0}, {2, -2, 0}, {-2, -2, 0}, {-2, 2, 0}, {2, 2, 0}};
 auto waypoint_idx = 0;
 
+// error
+auto error_integral = Vector3f(0,0,0);
+auto error_previous = Vector3f(0,0,0);
+
+//--------------------------------------------------------------------------------------------------
 // utility functions
-// transforms a point between two frames
+//--------------------------------------------------------------------------------------------------
+// transforms `point` from `from_frame` to `to_frame`
+// returns the transformed point
 geometry_msgs::TransformStamped transform;
 auto transform_point(Vector3f point, string from_frame, string to_frame) -> Vector3f {
+    // lookup transform
     try {
         transform = tf_buffer.lookupTransform(to_frame, from_frame, ros::Time::now());
     } catch (tf2::TransformException& ex) {
         ROS_INFO("%s", ex.what());
         ros::Duration(1.0).sleep();
     }
-    //----------------------------------------------------------------------------------------------
-    // transform from world frame to body frame
-    //----------------------------------------------------------------------------------------------
-    // point in world frame "map"
+    
+    // stamped point message in frame `from_frame`
     auto point_from_frame = geometry_msgs::PointStamped();
     // fill header
     point_from_frame.header.seq = seq_tf++;
@@ -92,33 +99,47 @@ auto transform_point(Vector3f point, string from_frame, string to_frame) -> Vect
     point_from_frame.point.x = hover_waypoint(0);
     point_from_frame.point.y = hover_waypoint(1);
     point_from_frame.point.z = hover_waypoint(2);
-    //----------------------------------------------------------------------------------------------
-    // point in point_body_frame frame "PX4/odom_local_ned"
+    
+    // stamped point message in frame `to_frame`
     auto point_to_frame = geometry_msgs::PointStamped();
     // fill header
     point_to_frame.header.seq = seq_tf++;
     point_to_frame.header.stamp = ros::Time::now();
     point_to_frame.header.frame_id = FRAME_BODY;
-    // apply transform outputting result to point_body_frame
+    // fill point data by applying transform
     tf2::doTransform(point_from_frame, point_to_frame, transform);
 
     return Vector3f(point_to_frame.point.x, point_to_frame.point.y, point_to_frame.point.z);
 }
-// command drone from errors
+//--------------------------------------------------------------------------------------------------
+// takes a 3D euclidean position error `error`,
+// updates integrat and derivative errors,
+// applies PID controller to produce velocity commands
 auto command_drone(Vector3f error) -> geometry_msgs::TwistStamped {
+    error_integral += error;                         // update integral error
+    auto error_derivative = error - error_previous;  // change in error since previous time step
+
+    // message to publish
     geometry_msgs::TwistStamped command;
-    // PID: kp * e(t) + ki * \int_0^t{e(t)} + kd * (e(t) - e(t-delta_time))
-    command.twist.linear.x = kp * error(0);
-    command.twist.linear.y = kp * error(1);
-    command.twist.linear.z = kp * error(2);
+    command.twist.linear.x = kp * error(0) + ki * error_integral(0) + kd * error_derivative(0);
+    command.twist.linear.y = kp * error(1) + ki * error_integral(1) + kd * error_derivative(1);
+    command.twist.linear.z = kp * error(2) + ki * error_integral(2) + kd * error_derivative(2);
+
+    // current error is the previous error for the next time step
+    error_previous = error;
 
     return command;
 }
 
+//--------------------------------------------------------------------------------------------------
 // callback functions
+//--------------------------------------------------------------------------------------------------
 auto odom_cb(const nav_msgs::Odometry::ConstPtr& msg) -> void { pose = msg->pose.pose; }
 auto state_cb(const mavros_msgs::State::ConstPtr& msg) -> void { drone_state = *msg; }
 
+//--------------------------------------------------------------------------------------------------
+// main program body
+//--------------------------------------------------------------------------------------------------
 auto main(int argc, char** argv) -> int {
     //----------------------------------------------------------------------------------------------
     // ROS initialisations
@@ -145,6 +166,14 @@ auto main(int argc, char** argv) -> int {
     // velocity publisher
     pub_velocity =
         nh.advertise<geometry_msgs::TwistStamped>("/mavros/setpoint_velocity/cmd_vel", 10);
+
+    //----------------------------------------------------------------------------------------------
+    // arm service client
+    client_arm = nh.serviceClient<mavros_msgs::CommandBool>("/mavros/cmd/arming");
+    // mode service client
+    client_mode = nh.serviceClient<mavros_msgs::SetMode>("/mavros/set_mode");
+    // land service client
+    client_land = nh.serviceClient<mavros_msgs::CommandTOL>("/mavros/cmd/land");
 
     //----------------------------------------------------------------------------------------------
     // wait for FCU connection
@@ -193,24 +222,42 @@ auto main(int argc, char** argv) -> int {
 
         switch (state) {
             case state.PASSIVE:
+                // state change
+                // in case the drone is ready start the mission
                 if (drone_state.armed && drone_state.mode == "OFFBOARD") {
                     state = state.HOVER;
                 }
                 break;
             case state.HOVER:
+                // control
                 auto error = transform_point(hover_waypoint, FRAME_WORLD, FRAME_BODY);
                 auto command = command_drone(error);
                 pub_velocity.publish(command);
-                if (error.norm() < TOLERANCE) {
-                    // change to waypoint navigation or land
-                    if (inspection_completed) {
+
+                // state change
+                if (error.norm() < TOLERANCE) {  // within tolerance, change state
+                    if (inspection_completed) {  // change to waypoint navigation or land
                         state = state.HOVER;
                     } else {
-                        state = state.WAYPOINT_NAVIGATION;
+                        state = state.INSPECTION;
                     }
                 }
                 break;
-            case state.WAYPOINT_NAVIGATION:
+            case state.INSPECTION:
+                // control
+                auto error = transform_point(inspection_waypoints[waypoint_idx], FRAME_INSPECTION, FRAME_BODY);
+                auto command = command_drone(error);
+                pub_velocity.publish(command);
+
+                // state change
+                if (error.norm() < TOLERANCE) {  // within tolerance, change to next waypoint
+                    waypoint_idx++;
+                    // change back to HOVER if all waypoints have been visited
+                    if (waypoint_idx > inspection_waypoints.size()) {
+                        inspection_completed = true;
+                        state = state.HOVER;
+                    }
+                }
                 break;
             case state.LAND:
                 break;
