@@ -1,16 +1,20 @@
+#include <geometry_msgs/Pose.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <mavros_msgs/CommandBool.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
+#include <nav_msgs/Odometry.h>
 #include <ros/ros.h>
 #include <tf2/utils.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <tf2_ros/transform_listener.h>
 
 #include <eigen3/Eigen/Dense>
+#include <vector>
 
 #include "boost/format.hpp"
 
+#define TOLERANCE 0.1
 // escape codes
 #define MAGENTA "\u001b[35m"
 #define GREEN "\u001b[32m"
@@ -18,6 +22,19 @@
 #define BOLD "\u001b[1m"
 #define ITALIC "\u001b[3m"
 #define UNDERLINE "\u001b[4m"
+// frames
+#define FRAME_WORLD "map"
+#define FRAME_INSPECTION "inspection"
+#define FRAME_BODY "PX4/odom_local_ned"
+
+using Eigen::Vector3f;
+using std::stof;
+using std::string;
+using std::vector;
+
+// state enumeration
+enum state { PASSIVE, HOVER, WAYPOINT_NAVIGATION, LAND };
+auto state = state.PASSIVE;
 
 // publishers
 ros::Publisher pub_velocity;
@@ -31,33 +48,81 @@ ros::ServiceClient client_arm;
 ros::ServiceClient client_mode;
 
 // state variables
-mavros_msgs::State state;
+mavros_msgs::State drone_state;
+geometry_msgs::Pose pose;
+auto inspection_completed = false;
 
 // transform utilities
 tf2_ros::Buffer tf_buffer;
-// frames
-auto frame_world = "map";
-auto frame_body = "inspection";
 
 // controller gains
 auto kp = 1.f;
-auto kd = 1.f;
 auto ki = 1.f;
+auto kd = 1.f;
 
-// callback functions
-auto odom_cb(const nav_msgs::Odometry::ConstPtr& msg) -> void {
-    // current position
-    auto pos = msg->pose.pose.position;
-    // current yaw
-    auto yaw = tf2::getYaw(msg->pose.pose.orientation);
+// sequence counters
+auto seq_tf = 0;
+
+// waypoints
+auto hover_waypoint = Vector3f(0, 0, 2);
+auto inspection_waypoints =
+    vector<Vector3f>{{2, 2, 0}, {2, -2, 0}, {-2, -2, 0}, {-2, 2, 0}, {2, 2, 0}};
+auto waypoint_idx = 0;
+
+// utility functions
+// transforms a point between two frames
+geometry_msgs::TransformStamped transform;
+auto transform_point(Vector3f point, string from_frame, string to_frame) -> Vector3f {
+    try {
+        transform = tf_buffer.lookupTransform(to_frame, from_frame, ros::Time::now());
+    } catch (tf2::TransformException& ex) {
+        ROS_INFO("%s", ex.what());
+        ros::Duration(1.0).sleep();
+    }
+    //----------------------------------------------------------------------------------------------
+    // transform from world frame to body frame
+    //----------------------------------------------------------------------------------------------
+    // point in world frame "map"
+    auto point_from_frame = geometry_msgs::PointStamped();
+    // fill header
+    point_from_frame.header.seq = seq_tf++;
+    point_from_frame.header.stamp = ros::Time::now();
+    point_from_frame.header.frame_id = FRAME_WORLD;
+    // fill point data
+    point_from_frame.point.x = hover_waypoint(0);
+    point_from_frame.point.y = hover_waypoint(1);
+    point_from_frame.point.z = hover_waypoint(2);
+    //----------------------------------------------------------------------------------------------
+    // point in point_body_frame frame "PX4/odom_local_ned"
+    auto point_to_frame = geometry_msgs::PointStamped();
+    // fill header
+    point_to_frame.header.seq = seq_tf++;
+    point_to_frame.header.stamp = ros::Time::now();
+    point_to_frame.header.frame_id = FRAME_BODY;
+    // apply transform outputting result to point_body_frame
+    tf2::doTransform(point_from_frame, point_to_frame, transform);
+
+    return Vector3f(point_to_frame.point.x, point_to_frame.point.y, point_to_frame.point.z);
+}
+// command drone from errors
+auto command_drone(Vector3f error) -> geometry_msgs::TwistStamped {
+    geometry_msgs::TwistStamped command;
+    // PID: kp * e(t) + ki * \int_0^t{e(t)} + kd * (e(t) - e(t-delta_time))
+    command.twist.linear.x = kp * error(0);
+    command.twist.linear.y = kp * error(1);
+    command.twist.linear.z = kp * error(2);
+
+    return command;
 }
 
-auto state_cb(const mavros_msgs::State::ConstPtr& msg) -> void { state = *msg; }
+// callback functions
+auto odom_cb(const nav_msgs::Odometry::ConstPtr& msg) -> void { pose = msg->pose.pose; }
+auto state_cb(const mavros_msgs::State::ConstPtr& msg) -> void { drone_state = *msg; }
 
 auto main(int argc, char** argv) -> int {
     //----------------------------------------------------------------------------------------------
     // ROS initialisations
-    ros::init(argc, argv, "mdi_test_controller");
+    ros::init(argc, argv, "mission_state_machine_node");
     auto nh = ros::NodeHandle();
     ros::Rate rate(20.0);
     //----------------------------------------------------------------------------------------------
@@ -67,8 +132,8 @@ auto main(int argc, char** argv) -> int {
     //----------------------------------------------------------------------------------------------
     // pass potential controller gain arguments
     if (argc > 1) kp = stof(argv[1]);
-    if (argc > 2) kd = stof(argv[2]);
-    if (argc > 3) ki = stof(argv[3]);
+    if (argc > 2) ki = stof(argv[2]);
+    if (argc > 3) kd = stof(argv[3]);
 
     //----------------------------------------------------------------------------------------------
     // state subscriber
@@ -83,36 +148,81 @@ auto main(int argc, char** argv) -> int {
 
     //----------------------------------------------------------------------------------------------
     // wait for FCU connection
-    while (ros::ok() && !state.connected) {
+    while (ros::ok() && !drone_state.connected) {
         ros::spinOnce();
         rate.sleep();
     }
-    //----------------------------------------------------------------------------------------------
-    // arm the drone
-    if (!state.armed) {
-        mavros_msgs::CommandBool srv;
-        srv.request.value = true;
-        if (client_arm.call(srv)) {
-            ROS_INFO("throttle armed: success");
-        } else {
-            ROS_INFO("throttle armed: fail");
-        }
-    }
-    //----------------------------------------------------------------------------------------------
-    // set drone mode to OFFBOARD
-    if (state.mode != "OFFBOARD") {
-        mavros_msgs::SetMode mode_msg;
-        mode_msg.request.custom_mode = "OFFBOARD";
 
-        if (client_mode.call(mode_msg) && mode_msg.response.mode_sent) {
-            ROS_INFO("mode set: OFFBOARD");
-        } else {
-            ROS_INFO("mode set: fail");
-        }
-    }
+    ros::Time last_request_time = ros::Time::now();
+
     //----------------------------------------------------------------------------------------------
     // ROS spin
     while (ros::ok()) {
+        //------------------------------------------------------------------------------------------
+        // set drone mode to OFFBOARD
+        if (drone_state.mode != "OFFBOARD" &&
+            (ros::Time::now() - last_request_time > ros::Duration(5.0))) {
+            mavros_msgs::SetMode mode_msg;
+            mode_msg.request.custom_mode = "OFFBOARD";
+
+            if (client_mode.call(mode_msg) && mode_msg.response.mode_sent) {
+                ROS_INFO("mode set: OFFBOARD");
+            } else {
+                ROS_INFO("mode set: fail");
+            }
+            last_request_time = ros::Time::now();
+        }
+        //------------------------------------------------------------------------------------------
+        // arm the drone
+        else if (!drone_state.armed &&
+                 (ros::Time::now() - last_request_time > ros::Duration(5.0))) {
+            mavros_msgs::CommandBool srv;
+            srv.request.value = true;
+            if (client_arm.call(srv)) {
+                ROS_INFO("throttle armed: success");
+            } else {
+                ROS_INFO("throttle armed: fail");
+            }
+            last_request_time = ros::Time::now();
+        }
+
+        //------------------------------------------------------------------------------------------
+        // control the drone
+
+        geometry_msgs::TransformStamped transform;
+
+        switch (state) {
+            case state.PASSIVE:
+                if (drone_state.armed && drone_state.mode == "OFFBOARD") {
+                    state = state.HOVER;
+                }
+                break;
+            case state.HOVER:
+                auto error = transform_point(hover_waypoint, FRAME_WORLD, FRAME_BODY);
+                auto command = command_drone(error);
+                pub_velocity.publish(command);
+                if (error.norm() < TOLERANCE) {
+                    // change to waypoint navigation or land
+                    if (inspection_completed) {
+                        state = state.HOVER;
+                    } else {
+                        state = state.WAYPOINT_NAVIGATION;
+                    }
+                }
+                break;
+            case state.WAYPOINT_NAVIGATION:
+                break;
+            case state.LAND:
+                break;
+        }
+
+        // hover at map pose (0,0,2)
+
+        // waypoint navigation
+
+        // hover at map pose (0,0,2)
+        // land here
+
         ros::spinOnce();
         rate.sleep();
     }
