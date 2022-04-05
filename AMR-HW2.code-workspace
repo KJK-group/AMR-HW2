@@ -10,6 +10,20 @@
 		],
 		"python.analysis.extraPaths": [
 			"/opt/ros/noetic/lib/python3/dist-packages"
-		]
+		],
+		"files.associations": {
+			"*.tcc": "cpp",
+			"bitset": "cpp",
+			"optional": "cpp",
+			"functional": "cpp",
+			"random": "cpp",
+			"fstream": "cpp",
+			"istream": "cpp",
+			"ostream": "cpp",
+			"sstream": "cpp",
+			"streambuf": "cpp",
+			"memory_resource": "cpp",
+			"condition_variable": "cpp"
+		}
 	}
 }
