@@ -21,18 +21,22 @@ auto main(int argc, char* argv[]) -> int {
     const auto crane_z = (3 - 2) * random01() + 2;
 
     auto crane_pose_msg = geometry_msgs::PoseStamped{};
-    crane_pose_msg.header.frame_id = "crane";
-    crane_pose_msg.pose.position.x = crane_x;
-    crane_pose_msg.pose.position.y = crane_y;
-    crane_pose_msg.pose.position.z = crane_z;
-    crane_pose_msg.pose.orientation.x = 0;
-    crane_pose_msg.pose.orientation.y = 0;
-    crane_pose_msg.pose.orientation.z = 0.1613559;
-    crane_pose_msg.pose.orientation.w = -0.9868963;
+    auto& header = crane_pose_msg.header;
+    auto& position = crane_pose_msg.pose.position;
+    auto& orientation = crane_pose_msg.pose.orientation;
+    header.frame_id = "inspection";
 
-    auto publish = [&]() {
-        crane_pose_msg.header.stamp = ros::Time::now();
+    position.x = crane_x;
+    position.y = crane_y;
+    position.z = crane_z;
+    orientation.x = 0;
+    orientation.y = 0;
+    orientation.z = 0.1613559;
+    orientation.w = -0.9868963;
+
+    const auto publish = [&]() {
         ROS_INFO("publishing crane_pose");
+        header.stamp = ros::Time::now();
         pub_crane_pose.publish(crane_pose_msg);
         ros::spinOnce();
         loop_rate.sleep();
