@@ -16,6 +16,7 @@ find_package(
              tf2_ros
              tf2_eigen)
 find_package(Eigen3 REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system)
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${catkin_INCLUDE_DIRS}
                     ${Eigen3_INCLUDE_DIRS})
