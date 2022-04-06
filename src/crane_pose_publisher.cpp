@@ -42,6 +42,7 @@ auto main(int argc, char* argv[]) -> int {
         loop_rate.sleep();
     };
 
+    ROS_INFO("start publishing crane_pose");
     while (ros::ok()) {
         publish();
     }

@@ -5,6 +5,8 @@
 
 	<node pkg="$(arg package)" type="crane_pose_publisher" name="crane_pose_publisher" output="screen" />
 	<node pkg="$(arg package)" type="map_to_inspection_tf_broadcaster" name="map_to_inspection_tf_broadcaster" output="screen" />
+
+	<node pkg="$(arg package)" type="publish_waypoints_in_rviz" name="publish_waypoints_in_rviz" output="screen" />
 	<node pkg="rviz" type="rviz" name="rviz" args="-d $(arg package_path)/rviz/task-1.rviz" />
 	<node name="rqt_tf_tree" pkg="rqt_tf_tree" type="rqt_tf_tree" />
 </launch>

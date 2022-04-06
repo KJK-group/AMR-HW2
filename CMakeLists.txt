@@ -18,8 +18,10 @@ find_package(
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system)
 
-include_directories(${CMAKE_SOURCE_DIR}/include ${catkin_INCLUDE_DIRS}
-                    ${Eigen3_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} ${Eigen3_INCLUDE_DIRS})
+
+file(GLOB header_files ${CMAKE_SOURCE_DIR}/include/*.hpp
+     ${CMAKE_SOURCE_DIR}/include/utils/*.hpp)
 
 # this needs to be here for rosrun and roslaunch
 catkin_package()
@@ -32,10 +34,13 @@ function(add_ros_executable name main)
 endfunction(add_ros_executable)
 
 add_ros_executable(crane_pose_publisher src/crane_pose_publisher.cpp)
-add_ros_executable(map_to_inspection_tf_broadcaster src/map_to_inspection_tf_broadcaster.cpp)
-add_ros_executable(map_to_odom_tf_broadcaster src/map_to_odom_tf_broadcaster.cpp)
-add_ros_executable(mission_state_machine_node src/mission_state_machine_node.cpp)
-target_compile_options(mission_state_machine_node PRIVATE "-g")
+add_ros_executable(map_to_inspection_tf_broadcaster
+                   src/map_to_inspection_tf_broadcaster.cpp)
+add_ros_executable(map_to_odom_tf_broadcaster
+                   src/map_to_odom_tf_broadcaster.cpp)
+add_ros_executable(mission_state_machine_node
+                   src/mission_state_machine_node.cpp)
+add_ros_executable(publish_waypoints_in_rviz src/publish_waypoints_in_rviz.cpp)
 
 # executable scripts
 install(PROGRAMS scripts/make_px4_gazebo.sh
