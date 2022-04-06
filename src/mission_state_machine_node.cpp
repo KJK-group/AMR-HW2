@@ -26,7 +26,7 @@
 // frames
 #define FRAME_WORLD "map"
 #define FRAME_INSPECTION "inspection"
-#define FRAME_BODY "PX4/odom_local_ned"
+#define FRAME_BODY "odom"
 
 using Eigen::Vector3f;
 using std::stof;
@@ -35,7 +35,7 @@ using std::vector;
 
 // state enumeration
 enum state { PASSIVE, HOVER, INSPECTION, LAND };
-auto state = state.PASSIVE;
+state mission_state = PASSIVE;
 
 // publishers
 ros::Publisher pub_velocity;
@@ -84,7 +84,7 @@ geometry_msgs::TransformStamped transform;
 auto transform_point(Vector3f point, string from_frame, string to_frame) -> Vector3f {
     // lookup transform
     try {
-        transform = tf_buffer.lookupTransform(to_frame, from_frame, ros::Time::now());
+        transform = tf_buffer.lookupTransform(to_frame, from_frame, ros::Time(0));
     } catch (tf2::TransformException& ex) {
         ROS_INFO("%s", ex.what());
         ros::Duration(1.0).sleep();
@@ -183,72 +183,53 @@ auto main(int argc, char** argv) -> int {
         rate.sleep();
     }
 
-    ros::Time previous_request_time = ros::Time::now();
+    ros::Time previous_request_time = ros::Time(0);
+    // offboard mode message
+    mavros_msgs::SetMode mode_msg;
+    mode_msg.request.custom_mode = "OFFBOARD";
+    // arm message
+    mavros_msgs::CommandBool srv;
+    srv.request.value = true;
 
     //----------------------------------------------------------------------------------------------
-    // ROS spin
+    // ROS control loop
     while (ros::ok()) {
-        //------------------------------------------------------------------------------------------
-        // request to set drone mode to OFFBOARD every 5 seconds until drone is in OFFBOARD mode
-        if (drone_state.mode != "OFFBOARD" &&
-            (ros::Time::now() - previous_request_time > ros::Duration(5.0))) {
-            mavros_msgs::SetMode mode_msg;
-            mode_msg.request.custom_mode = "OFFBOARD";
-
-            if (client_mode.call(mode_msg) && mode_msg.response.mode_sent) {
-                ROS_INFO("mode set: OFFBOARD");
-            } else {
-                ROS_INFO("mode set: fail");
-            }
-            previous_request_time = ros::Time::now();
-        }
-        //------------------------------------------------------------------------------------------
-        // request to arm throttle every 5 seconds until drone is armed
-        else if (!drone_state.armed &&
-                 (ros::Time::now() - previous_request_time > ros::Duration(5.0))) {
-            mavros_msgs::CommandBool srv;
-            srv.request.value = true;
-            if (client_arm.call(srv)) {
-                ROS_INFO("throttle armed: success");
-            } else {
-                ROS_INFO("throttle armed: fail");
-            }
-            previous_request_time = ros::Time::now();
-        }
-
         //------------------------------------------------------------------------------------------
         // control the drone
 
         geometry_msgs::TransformStamped transform;
+        geometry_msgs::TwistStamped command;
+        Vector3f error;
 
-        switch (state) {
-            case state.PASSIVE:
+        switch (mission_state) {
+            case PASSIVE:
                 // state change
                 // in case the drone is ready start the mission
-                if (drone_state.armed && drone_state.mode == "OFFBOARD") {
-                    state = state.HOVER;
-                }
+                // if (drone_state.armed && drone_state.mode == "OFFBOARD") {
+                //     mission_state = HOVER;
+                // }
+                mission_state = HOVER;
                 break;
-            case state.HOVER:
+            case HOVER:
                 // control
-                auto error = transform_point(hover_waypoint, FRAME_WORLD, FRAME_BODY);
-                auto command = command_drone(error);
+                error = transform_point(hover_waypoint, FRAME_WORLD, FRAME_BODY);
+                command = command_drone(error);
                 pub_velocity.publish(command);
 
                 // state change
                 if (error.norm() < TOLERANCE) {  // within tolerance, change state
                     if (inspection_completed) {  // change to waypoint navigation or land
-                        state = state.LAND;
+                        mission_state = LAND;
                     } else {
-                        state = state.INSPECTION;
+                        mission_state = INSPECTION;
                     }
                 }
                 break;
-            case state.INSPECTION:
+            case INSPECTION:
                 // control
-                auto error = transform_point(inspection_waypoints[waypoint_idx], FRAME_INSPECTION,
-                                             FRAME_BODY);
-                auto command = command_drone(error);
+                error = transform_point(inspection_waypoints[waypoint_idx], FRAME_INSPECTION,
+                                        FRAME_BODY);
+                command = command_drone(error);
                 pub_velocity.publish(command);
 
                 // state change
@@ -257,11 +238,11 @@ auto main(int argc, char** argv) -> int {
                     // change back to HOVER if all waypoints have been visited
                     if (waypoint_idx > inspection_waypoints.size()) {
                         inspection_completed = true;
-                        state = state.HOVER;
+                        mission_state = HOVER;
                     }
                 }
                 break;
-            case state.LAND:
+            case LAND:
                 // request to land every 5 seconds until drone is landing
                 if (drone_state.mode != "AUTO.LAND" &&
                     (ros::Time::now() - previous_request_time > ros::Duration(5.0))) {
@@ -277,13 +258,27 @@ auto main(int argc, char** argv) -> int {
                 }
                 break;
         }
-
-        // hover at map pose (0,0,2)
-
-        // waypoint navigation
-
-        // hover at map pose (0,0,2)
-        // land here
+        //------------------------------------------------------------------------------------------
+        // request to set drone mode to OFFBOARD every 5 seconds until drone is in OFFBOARD mode
+        if (drone_state.mode != "OFFBOARD" &&
+            (ros::Time::now() - previous_request_time > ros::Duration(5.0))) {
+            if (client_mode.call(mode_msg) && mode_msg.response.mode_sent) {
+                ROS_INFO("mode set: OFFBOARD");
+            } else {
+                ROS_INFO("mode set: fail");
+            }
+            previous_request_time = ros::Time::now();
+        }
+        //------------------------------------------------------------------------------------------
+        // request to arm throttle every 5 seconds until drone is armed
+        if (!drone_state.armed && (ros::Time::now() - previous_request_time > ros::Duration(5.0))) {
+            if (client_arm.call(srv)) {
+                ROS_INFO("throttle armed: success");
+            } else {
+                ROS_INFO("throttle armed: fail");
+            }
+            previous_request_time = ros::Time::now();
+        }
 
         ros::spinOnce();
         rate.sleep();
