@@ -11,6 +11,7 @@
 #include <tf2_ros/transform_listener.h>
 
 #include <eigen3/Eigen/Dense>
+#include <optional>
 #include <vector>
 
 #include "boost/format.hpp"
@@ -28,7 +29,11 @@
 #define FRAME_INSPECTION "inspection"
 #define FRAME_BODY "odom"
 
+using boost::format;
+using boost::io::group;
 using Eigen::Vector3f;
+using std::setfill;
+using std::setw;
 using std::stof;
 using std::string;
 using std::vector;
@@ -74,6 +79,11 @@ auto waypoint_idx = 0;
 // error
 auto error_integral = Vector3f(0, 0, 0);
 auto error_previous = Vector3f(0, 0, 0);
+// previous command - used for logging
+geometry_msgs::TwistStamped command_previous;
+
+// time
+ros::Time start_time;
 
 //--------------------------------------------------------------------------------------------------
 // utility functions
@@ -81,13 +91,15 @@ auto error_previous = Vector3f(0, 0, 0);
 // transforms `point` from `from_frame` to `to_frame`
 // returns the transformed point
 geometry_msgs::TransformStamped transform;
-auto transform_point(Vector3f point, string from_frame, string to_frame) -> Vector3f {
+auto transform_point(Vector3f point, string from_frame, string to_frame)
+    -> std::optional<Vector3f> {
     // lookup transform
     try {
         transform = tf_buffer.lookupTransform(to_frame, from_frame, ros::Time(0));
     } catch (tf2::TransformException& ex) {
         ROS_INFO("%s", ex.what());
         ros::Duration(1.0).sleep();
+        return std::nullopt;
     }
 
     // stamped point message in frame `from_frame`
@@ -120,6 +132,19 @@ auto command_drone(Vector3f error) -> geometry_msgs::TwistStamped {
     error_integral += error;                         // update integral error
     auto error_derivative = error - error_previous;  // change in error since previous time step
 
+    std::cout << MAGENTA << "error: " << error << std::endl;
+    std::cout << MAGENTA << "error_integral: " << error_integral << std::endl;
+    std::cout << MAGENTA << "error_derivative: " << error_integral << std::endl;
+
+    // error terms
+    auto proportional_term = kp * error;
+    auto integral_term = ki * error_integral;
+    auto derivative_term = kd * error_derivative;
+
+    std::cout << MAGENTA << "proportional_term: " << proportional_term << std::endl;
+    std::cout << MAGENTA << "integral_term: " << integral_term << std::endl;
+    std::cout << MAGENTA << "derivative_term: " << derivative_term << std::endl;
+
     // message to publish
     geometry_msgs::TwistStamped command;
     command.twist.linear.x = kp * error(0) + ki * error_integral(0) + kd * error_derivative(0);
@@ -128,6 +153,8 @@ auto command_drone(Vector3f error) -> geometry_msgs::TwistStamped {
 
     // current error is the previous error for the next time step
     error_previous = error;
+
+    command_previous = command;
 
     return command;
 }
@@ -147,6 +174,7 @@ auto main(int argc, char** argv) -> int {
     ros::init(argc, argv, "mission_state_machine_node");
     auto nh = ros::NodeHandle();
     ros::Rate rate(20.0);
+    start_time = ros::Time::now();
     //----------------------------------------------------------------------------------------------
     // transform utilities
     tf2_ros::TransformListener tf_listener(tf_buffer);
@@ -199,7 +227,7 @@ auto main(int argc, char** argv) -> int {
 
         geometry_msgs::TransformStamped transform;
         geometry_msgs::TwistStamped command;
-        Vector3f error;
+        // std::optional<Vector3f> error;
 
         switch (mission_state) {
             case PASSIVE:
@@ -212,33 +240,40 @@ auto main(int argc, char** argv) -> int {
                 break;
             case HOVER:
                 // control
-                error = transform_point(hover_waypoint, FRAME_WORLD, FRAME_BODY);
-                command = command_drone(error);
-                pub_velocity.publish(command);
+                // error = transform_point(hover_waypoint, FRAME_WORLD, FRAME_BODY);
+                if (auto error = transform_point(hover_waypoint, FRAME_WORLD, FRAME_BODY)) {
+                    command = command_drone(*error);
+                    pub_velocity.publish(command);
 
-                // state change
-                if (error.norm() < TOLERANCE) {  // within tolerance, change state
-                    if (inspection_completed) {  // change to waypoint navigation or land
-                        mission_state = LAND;
-                    } else {
-                        mission_state = INSPECTION;
+                    // state change
+                    if ((*error).norm() < TOLERANCE) {  // within tolerance, change state
+                        if (inspection_completed) {     // change to waypoint navigation or land
+                            mission_state = LAND;
+                        } else {
+                            mission_state = INSPECTION;
+                        }
                     }
                 }
                 break;
             case INSPECTION:
                 // control
-                error = transform_point(inspection_waypoints[waypoint_idx], FRAME_INSPECTION,
-                                        FRAME_BODY);
-                command = command_drone(error);
-                pub_velocity.publish(command);
+                // error = transform_point(inspection_waypoints[waypoint_idx], FRAME_INSPECTION,
+                //                        FRAME_BODY);
+                if (auto error = transform_point(inspection_waypoints[waypoint_idx],
+                                                 FRAME_INSPECTION, FRAME_BODY)) {
+                    command = command_drone(*error);
+                    pub_velocity.publish(command);
 
-                // state change
-                if (error.norm() < TOLERANCE) {  // within tolerance, change to next waypoint
-                    waypoint_idx++;
-                    // change back to HOVER if all waypoints have been visited
-                    if (waypoint_idx > inspection_waypoints.size()) {
-                        inspection_completed = true;
-                        mission_state = HOVER;
+                    // state change
+                    std::cout << "(*error).norm()" << (*error).norm() << std::endl;
+                    if ((*error).norm() < TOLERANCE) {  // within tolerance, change to
+                        // next waypoint
+                        waypoint_idx++;
+                        // change back to HOVER if all waypoints have been visited
+                        if (waypoint_idx >= inspection_waypoints.size()) {
+                            inspection_completed = true;
+                            mission_state = HOVER;
+                        }
                     }
                 }
                 break;
@@ -279,6 +314,59 @@ auto main(int argc, char** argv) -> int {
             }
             previous_request_time = ros::Time::now();
         }
+
+        auto delta_time = (ros::Time::now() - start_time).toSec();
+        int w;
+        int time = delta_time;
+        for (w = 0; time > 0; w++) {
+            time /= 10;
+        }
+
+        //------------------------------------------------------------------------------------------
+        // ROS logging
+        //------------------------------------------------------------------------------------------
+        // mission state
+        ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "mission:" << RESET);
+        ROS_INFO_STREAM("  time:  " << format("%1.2f") %
+                                           group(setfill(' '), setw(w + 2), delta_time));
+        ROS_INFO_STREAM("  state: " << format("%1.2f") %
+                                           group(setfill(' '), setw(w), mission_state));
+        ROS_INFO_STREAM("  index: " << format("%1.2f") %
+                                           group(setfill(' '), setw(w), waypoint_idx + 1));
+        ROS_INFO_STREAM("  waypoint:");
+        ROS_INFO_STREAM(
+            "    x: " << format("%1.5f") %
+                             group(setfill(' '), setw(8), inspection_waypoints[waypoint_idx](0)));
+        ROS_INFO_STREAM(
+            "    y: " << format("%1.5f") %
+                             group(setfill(' '), setw(8), inspection_waypoints[waypoint_idx](1)));
+        ROS_INFO_STREAM(
+            "    z: " << format("%1.5f") %
+                             group(setfill(' '), setw(8), inspection_waypoints[waypoint_idx](2)));
+        //------------------------------------------------------------------------------------------
+        // drone position
+        ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "position:" << RESET);
+        ROS_INFO_STREAM("  x: " << format("%1.5f") % group(setfill(' '), setw(8), pose.position.x));
+        ROS_INFO_STREAM("  y: " << format("%1.5f") % group(setfill(' '), setw(8), pose.position.y));
+        ROS_INFO_STREAM("  z: " << format("%1.5f") % group(setfill(' '), setw(8), pose.position.z));
+        //------------------------------------------------------------------------------------------
+        // position errors
+        ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "errors:" << RESET);
+        ROS_INFO_STREAM("  x: " << format("%1.5f") %
+                                       group(setfill(' '), setw(8), error_previous(0)));
+        ROS_INFO_STREAM("  y: " << format("%1.5f") %
+                                       group(setfill(' '), setw(8), error_previous(1)));
+        ROS_INFO_STREAM("  z: " << format("%1.5f") %
+                                       group(setfill(' '), setw(8), error_previous(2)));
+        //------------------------------------------------------------------------------------------
+        // controller outputs
+        ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "controller outputs:" << RESET);
+        ROS_INFO_STREAM("  x_vel: " << format("%1.5f") % group(setfill(' '), setw(8),
+                                                               command_previous.twist.linear.x));
+        ROS_INFO_STREAM("  y_vel: " << format("%1.5f") % group(setfill(' '), setw(8),
+                                                               command_previous.twist.linear.y));
+        ROS_INFO_STREAM("  z_vel: " << format("%1.5f") % group(setfill(' '), setw(8),
+                                                               command_previous.twist.linear.z));
 
         ros::spinOnce();
         rate.sleep();

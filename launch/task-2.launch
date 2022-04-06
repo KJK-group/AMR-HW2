@@ -3,6 +3,12 @@
 	<arg name="package" value="amr-hw2" />
 	<arg name="package_path" value="$(find amr-hw2)" />
     <arg name="catkin_ws_path" default="$(optenv SOURCED_WS ~/catkin_ws)"/>
+    <arg name="kp" default="1"/>
+    <arg name="ki" default="1"/>
+    <arg name="kd" default="1"/>
+
+    <include file="$(arg package_path)/launch/task-1.launch"/>
+    <node pkg="$(arg package)" type="map_to_odom_tf_broadcaster" name="map_to_odom_tf_broadcaster"/>
 
     <node
         pkg="$(arg package)"
@@ -14,6 +20,10 @@
         <arg name="fcu_url" default="udp://:14540@127.0.0.1:14557"/>
     </include>
 
-	<node pkg="$(arg package)" type="mission_state_machine_node" name="mission_state_machine_node" output="screen" />
-	<node pkg="rviz" type="rviz" name="rviz" args="-d $(arg package_path)/rviz/task-1.rviz" />
+	<!-- <node
+        pkg="$(arg package)"
+        type="mission_state_machine_node"
+        name="mission_state_machine_node"
+        args="$(arg kp) $(arg ki) $(arg kd)"
+        output="screen" /> -->
 </launch>

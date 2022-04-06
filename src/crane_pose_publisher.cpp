@@ -35,7 +35,7 @@ auto main(int argc, char* argv[]) -> int {
     orientation.w = -0.9868963;
 
     const auto publish = [&]() {
-        ROS_INFO("publishing crane_pose");
+        // ROS_INFO("publishing crane_pose");
         header.stamp = ros::Time::now();
         pub_crane_pose.publish(crane_pose_msg);
         ros::spinOnce();
