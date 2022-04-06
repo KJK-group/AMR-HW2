@@ -1,6 +1,7 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <mavros_msgs/CommandBool.h>
+#include <mavros_msgs/CommandTOL.h>
 #include <mavros_msgs/SetMode.h>
 #include <mavros_msgs/State.h>
 #include <nav_msgs/Odometry.h>
@@ -71,8 +72,8 @@ auto inspection_waypoints =
 auto waypoint_idx = 0;
 
 // error
-auto error_integral = Vector3f(0,0,0);
-auto error_previous = Vector3f(0,0,0);
+auto error_integral = Vector3f(0, 0, 0);
+auto error_previous = Vector3f(0, 0, 0);
 
 //--------------------------------------------------------------------------------------------------
 // utility functions
@@ -245,7 +246,8 @@ auto main(int argc, char** argv) -> int {
                 break;
             case state.INSPECTION:
                 // control
-                auto error = transform_point(inspection_waypoints[waypoint_idx], FRAME_INSPECTION, FRAME_BODY);
+                auto error = transform_point(inspection_waypoints[waypoint_idx], FRAME_INSPECTION,
+                                             FRAME_BODY);
                 auto command = command_drone(error);
                 pub_velocity.publish(command);
 
@@ -264,7 +266,7 @@ auto main(int argc, char** argv) -> int {
                 if (drone_state.mode != "AUTO.LAND" &&
                     (ros::Time::now() - previous_request_time > ros::Duration(5.0))) {
                     mavros_msgs::CommandTOL land_msg;
-                    land_msg.altitude = 2;
+                    land_msg.request.altitude = 2;
 
                     if (client_land.call(land_msg)) {
                         ROS_INFO("drone landing service request: success");
