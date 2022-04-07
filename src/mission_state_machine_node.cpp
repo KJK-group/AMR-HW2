@@ -18,6 +18,7 @@
 #include "utils/rviz.hpp"
 
 #define TOLERANCE 0.1
+#define TOLERANCE_VELOCITY 0.2
 // escape codes
 #define MAGENTA "\u001b[35m"
 #define GREEN "\u001b[32m"
@@ -77,7 +78,7 @@ ros::ServiceClient client_land;
 
 // state variables
 mavros_msgs::State drone_state;
-geometry_msgs::Pose pose;
+nav_msgs::Odometry odom;
 auto inspection_completed = false;
 
 // transform utilities
@@ -107,6 +108,15 @@ geometry_msgs::TwistStamped command_previous;
 ros::Time start_time;
 
 auto sphere_msg_gen = utils::rviz::sphere_msg_gen();
+
+auto previous_velocity = Vector3f(0, 0, 0);
+auto acceleration = Vector3f(0, 0, 0);
+auto acceleration_from_odom() -> Vector3f {
+    acceleration =
+        previous_velocity -
+        Vector3f(odom.twist.twist.linear.x, odom.twist.twist.linear.y, odom.twist.twist.linear.z);
+    return acceleration;
+}
 
 //--------------------------------------------------------------------------------------------------
 // utility functions
@@ -204,7 +214,15 @@ auto command_drone(Vector3f error) -> geometry_msgs::TwistStamped {
 //--------------------------------------------------------------------------------------------------
 // callback functions
 //--------------------------------------------------------------------------------------------------
-auto odom_cb(const nav_msgs::Odometry::ConstPtr& msg) -> void { pose = msg->pose.pose; }
+auto odom_cb(const nav_msgs::Odometry::ConstPtr& msg) -> void {
+    odom = *msg;
+    static auto path_msg_gen = utils::rviz::sphere_msg_gen("drone_path");
+    auto path_msg = path_msg_gen(odom.pose.pose);
+    path_msg.color.b = 1.f;
+    path_msg.color.a = 0.5f;
+    pub_waypoints.publish(path_msg);
+    ros::spinOnce();
+}
 auto state_cb(const mavros_msgs::State::ConstPtr& msg) -> void { drone_state = *msg; }
 
 //--------------------------------------------------------------------------------------------------
@@ -284,14 +302,15 @@ auto main(int argc, char** argv) -> int {
                 break;
             case HOVER:
                 // control
-                // error = transform_point(hover_waypoint, FRAME_WORLD, FRAME_BODY);
                 if (auto error = transform_point(hover_waypoint, FRAME_WORLD, FRAME_BODY)) {
                     command = command_drone(*error);
                     pub_velocity.publish(command);
 
                     // state change
-                    if ((*error).norm() < TOLERANCE) {  // within tolerance, change state
-                        if (inspection_completed) {     // change to waypoint navigation or land
+                    if ((*error).norm() < TOLERANCE &&
+                        acceleration_from_odom().norm() <
+                            TOLERANCE_VELOCITY) {    // within tolerance, change state
+                        if (inspection_completed) {  // change to waypoint navigation or land
                             mission_state = LAND;
                         } else {
                             mission_state = INSPECTION;
@@ -301,15 +320,15 @@ auto main(int argc, char** argv) -> int {
                 break;
             case INSPECTION:
                 // control
-                // error = transform_point(inspection_waypoints[waypoint_idx], FRAME_INSPECTION,
-                //                        FRAME_BODY);
                 if (auto error = transform_point(inspection_waypoints[waypoint_idx],
                                                  FRAME_INSPECTION, FRAME_BODY)) {
                     command = command_drone(*error);
                     pub_velocity.publish(command);
 
                     // state change
-                    if ((*error).norm() < TOLERANCE) {  // within tolerance, change to
+                    if ((*error).norm() < TOLERANCE &&
+                        acceleration_from_odom().norm() <
+                            TOLERANCE_VELOCITY) {  // within tolerance, change to
                         // next waypoint, reset integral error
                         waypoint_idx++;
                         error_integral = Vector3f(0, 0, 0);
@@ -376,10 +395,10 @@ auto main(int argc, char** argv) -> int {
         ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "mission:" << RESET);
         ROS_INFO_STREAM("  time:  " << format("%1.2f") %
                                            group(setfill(' '), setw(w + 2), delta_time));
-        ROS_INFO_STREAM("  state: " << format("%1.2f") % group(setfill(' '), setw(w),
-                                                               state_to_string(mission_state)));
         ROS_INFO_STREAM("  index: " << format("%1.2f") %
                                            group(setfill(' '), setw(w), waypoint_idx + 1));
+        ROS_INFO_STREAM("  state: " << format("%1.2f") % group(setfill(' '), setw(w),
+                                                               state_to_string(mission_state)));
         ROS_INFO_STREAM("  waypoint:");
         ROS_INFO_STREAM(
             "    x: " << format("%1.5f") %
@@ -393,9 +412,17 @@ auto main(int argc, char** argv) -> int {
         //------------------------------------------------------------------------------------------
         // drone position
         ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "position:" << RESET);
-        ROS_INFO_STREAM("  x: " << format("%1.5f") % group(setfill(' '), setw(8), pose.position.x));
-        ROS_INFO_STREAM("  y: " << format("%1.5f") % group(setfill(' '), setw(8), pose.position.y));
-        ROS_INFO_STREAM("  z: " << format("%1.5f") % group(setfill(' '), setw(8), pose.position.z));
+        ROS_INFO_STREAM("  x:    " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), odom.pose.pose.position.x));
+        ROS_INFO_STREAM("  y:    " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), odom.pose.pose.position.y));
+        ROS_INFO_STREAM("  z:    " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), odom.pose.pose.position.z));
+        ROS_INFO_STREAM("  norm: " << format("%1.5f") % group(setfill(' '), setw(8),
+                                                              Vector3f(odom.pose.pose.position.x,
+                                                                       odom.pose.pose.position.y,
+                                                                       odom.pose.pose.position.z)
+                                                                  .norm()));
         //------------------------------------------------------------------------------------------
         // position errors
         ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "errors:" << RESET);
@@ -416,6 +443,23 @@ auto main(int argc, char** argv) -> int {
                                                                command_previous.twist.linear.y));
         ROS_INFO_STREAM("  z_vel: " << format("%1.5f") % group(setfill(' '), setw(8),
                                                                command_previous.twist.linear.z));
+        ROS_INFO_STREAM("  norm:  " << format("%1.5f") %
+                                           group(setfill(' '), setw(8),
+                                                 Vector3f(command_previous.twist.linear.x,
+                                                          command_previous.twist.linear.y,
+                                                          command_previous.twist.linear.z)
+                                                     .norm()));
+        //------------------------------------------------------------------------------------------
+        // acceleration
+        ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "acceleration:" << RESET);
+        ROS_INFO_STREAM("  x: " << format("%1.5f") %
+                                       group(setfill(' '), setw(8), acceleration.x()));
+        ROS_INFO_STREAM("  y: " << format("%1.5f") %
+                                       group(setfill(' '), setw(8), acceleration.y()));
+        ROS_INFO_STREAM("  z: " << format("%1.5f") %
+                                       group(setfill(' '), setw(8), acceleration.z()));
+        ROS_INFO_STREAM("  norm: " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), acceleration.norm()));
 
         ros::spinOnce();
         rate.sleep();
