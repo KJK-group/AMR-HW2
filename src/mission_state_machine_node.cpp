@@ -18,7 +18,8 @@
 #include "utils/rviz.hpp"
 
 #define TOLERANCE 0.1
-#define TOLERANCE_VELOCITY 0.2
+#define TOLERANCE_VELOCITY 0.1
+#define TOLERANCE_ACCELERATION 0.2
 // escape codes
 #define MAGENTA "\u001b[35m"
 #define GREEN "\u001b[32m"
@@ -111,11 +112,17 @@ auto sphere_msg_gen = utils::rviz::sphere_msg_gen();
 
 auto previous_velocity = Vector3f(0, 0, 0);
 auto acceleration = Vector3f(0, 0, 0);
+auto velocity = Vector3f(0, 0, 0);
 auto acceleration_from_odom() -> Vector3f {
     acceleration =
         previous_velocity -
         Vector3f(odom.twist.twist.linear.x, odom.twist.twist.linear.y, odom.twist.twist.linear.z);
     return acceleration;
+}
+auto velocity_from_odom() -> Vector3f {
+    velocity =
+        Vector3f(odom.twist.twist.linear.x, odom.twist.twist.linear.y, odom.twist.twist.linear.z);
+    return velocity;
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -308,7 +315,8 @@ auto main(int argc, char** argv) -> int {
 
                     // state change
                     if ((*error).norm() < TOLERANCE &&
-                        acceleration_from_odom().norm() <
+                        acceleration_from_odom().norm() < TOLERANCE_ACCELERATION &&
+                        velocity_from_odom().norm() <
                             TOLERANCE_VELOCITY) {    // within tolerance, change state
                         if (inspection_completed) {  // change to waypoint navigation or land
                             mission_state = LAND;
@@ -327,7 +335,8 @@ auto main(int argc, char** argv) -> int {
 
                     // state change
                     if ((*error).norm() < TOLERANCE &&
-                        acceleration_from_odom().norm() <
+                        acceleration_from_odom().norm() < TOLERANCE_ACCELERATION &&
+                        velocity_from_odom().norm() <
                             TOLERANCE_VELOCITY) {  // within tolerance, change to
                         // next waypoint, reset integral error
                         waypoint_idx++;
@@ -452,14 +461,22 @@ auto main(int argc, char** argv) -> int {
         //------------------------------------------------------------------------------------------
         // acceleration
         ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "acceleration:" << RESET);
-        ROS_INFO_STREAM("  x: " << format("%1.5f") %
-                                       group(setfill(' '), setw(8), acceleration.x()));
-        ROS_INFO_STREAM("  y: " << format("%1.5f") %
-                                       group(setfill(' '), setw(8), acceleration.y()));
-        ROS_INFO_STREAM("  z: " << format("%1.5f") %
-                                       group(setfill(' '), setw(8), acceleration.z()));
+        ROS_INFO_STREAM("  x:    " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), acceleration.x()));
+        ROS_INFO_STREAM("  y:    " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), acceleration.y()));
+        ROS_INFO_STREAM("  z:    " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), acceleration.z()));
         ROS_INFO_STREAM("  norm: " << format("%1.5f") %
                                           group(setfill(' '), setw(8), acceleration.norm()));
+        //------------------------------------------------------------------------------------------
+        // velocity
+        ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "velocity:" << RESET);
+        ROS_INFO_STREAM("  x:    " << format("%1.5f") % group(setfill(' '), setw(8), velocity.x()));
+        ROS_INFO_STREAM("  y:    " << format("%1.5f") % group(setfill(' '), setw(8), velocity.y()));
+        ROS_INFO_STREAM("  z:    " << format("%1.5f") % group(setfill(' '), setw(8), velocity.z()));
+        ROS_INFO_STREAM("  norm: " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), velocity.norm()));
 
         ros::spinOnce();
         rate.sleep();
