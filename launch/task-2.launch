@@ -20,10 +20,10 @@
         <arg name="fcu_url" default="udp://:14540@127.0.0.1:14557"/>
     </include>
 
-	<!-- <node
+	<node
         pkg="$(arg package)"
         type="mission_state_machine_node"
         name="mission_state_machine_node"
         args="$(arg kp) $(arg ki) $(arg kd)"
-        output="screen" /> -->
+        output="screen" />
 </launch>

@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "boost/format.hpp"
+#include "utils/rviz.hpp"
 
 #define TOLERANCE 0.1
 // escape codes
@@ -40,10 +41,30 @@ using std::vector;
 
 // state enumeration
 enum state { PASSIVE, HOVER, INSPECTION, LAND };
+auto state_to_string(state s) -> string {
+    switch (s) {
+        case PASSIVE:
+            return "PASSIVE";
+            break;
+        case HOVER:
+            return "HOVER";
+            break;
+        case INSPECTION:
+            return "INSPECTION";
+            break;
+        case LAND:
+            return "LAND";
+            break;
+        default:
+            return "UNKNOWN";
+            break;
+    }
+}
 state mission_state = PASSIVE;
 
 // publishers
 ros::Publisher pub_velocity;
+ros::Publisher pub_waypoints;
 
 // subscribers
 ros::Subscriber sub_state;
@@ -73,7 +94,7 @@ auto seq_tf = 0;
 // waypoints
 auto hover_waypoint = Vector3f(0, 0, 2);
 auto inspection_waypoints =
-    vector<Vector3f>{{2, 2, 0}, {2, -2, 0}, {-2, -2, 0}, {-2, 2, 0}, {2, 2, 0}};
+    vector<Vector3f>{{-2, -2, 0}, {-2, 2, 0}, {2, 2, 0}, {2, -2, 0}, {-2, -2, 0}};
 auto waypoint_idx = 0;
 
 // error
@@ -85,6 +106,8 @@ geometry_msgs::TwistStamped command_previous;
 // time
 ros::Time start_time;
 
+auto sphere_msg_gen = utils::rviz::sphere_msg_gen();
+
 //--------------------------------------------------------------------------------------------------
 // utility functions
 //--------------------------------------------------------------------------------------------------
@@ -93,6 +116,8 @@ ros::Time start_time;
 geometry_msgs::TransformStamped transform;
 auto transform_point(Vector3f point, string from_frame, string to_frame)
     -> std::optional<Vector3f> {
+    // std::cout << MAGENTA << "input point:\n" << point << RESET << std::endl;
+
     // lookup transform
     try {
         transform = tf_buffer.lookupTransform(to_frame, from_frame, ros::Time(0));
@@ -107,49 +132,66 @@ auto transform_point(Vector3f point, string from_frame, string to_frame)
     // fill header
     point_from_frame.header.seq = seq_tf++;
     point_from_frame.header.stamp = ros::Time::now();
-    point_from_frame.header.frame_id = FRAME_WORLD;
+    point_from_frame.header.frame_id = from_frame;
     // fill point data
-    point_from_frame.point.x = hover_waypoint(0);
-    point_from_frame.point.y = hover_waypoint(1);
-    point_from_frame.point.z = hover_waypoint(2);
+    point_from_frame.point.x = point.x();
+    point_from_frame.point.y = point.y();
+    point_from_frame.point.z = point.z();
 
     // stamped point message in frame `to_frame`
     auto point_to_frame = geometry_msgs::PointStamped();
     // fill header
     point_to_frame.header.seq = seq_tf++;
     point_to_frame.header.stamp = ros::Time::now();
-    point_to_frame.header.frame_id = FRAME_BODY;
+    point_to_frame.header.frame_id = to_frame;
     // fill point data by applying transform
     tf2::doTransform(point_from_frame, point_to_frame, transform);
 
-    return Vector3f(point_to_frame.point.x, point_to_frame.point.y, point_to_frame.point.z);
+    // std::cout << MAGENTA << "output point:\n" << point_to_frame << RESET << std::endl;
+
+    auto transformed_point =
+        Vector3f(point_to_frame.point.x, point_to_frame.point.y, point_to_frame.point.z);
+    auto msg = sphere_msg_gen(point);
+    msg.header.frame_id = from_frame;
+    pub_waypoints.publish(msg);
+    auto msg2 = sphere_msg_gen(transformed_point);
+    msg2.color.r = 1.f;
+    msg2.color.g = 0.f;
+    msg2.header.frame_id = to_frame;
+    pub_waypoints.publish(msg2);
+
+    return transformed_point;
 }
 //--------------------------------------------------------------------------------------------------
 // takes a 3D euclidean position error `error`,
 // updates integrat and derivative errors,
 // applies PID controller to produce velocity commands
 auto command_drone(Vector3f error) -> geometry_msgs::TwistStamped {
-    error_integral += error;                         // update integral error
+    if (drone_state.armed) {
+        error_integral += error;
+    }                                                // update integral error
     auto error_derivative = error - error_previous;  // change in error since previous time step
 
-    std::cout << MAGENTA << "error: " << error << std::endl;
-    std::cout << MAGENTA << "error_integral: " << error_integral << std::endl;
-    std::cout << MAGENTA << "error_derivative: " << error_integral << std::endl;
+    // std::cout << MAGENTA << "error: " << error << std::endl;
+    // std::cout << MAGENTA << "error_integral: " << error_integral << std::endl;
+    // std::cout << MAGENTA << "error_derivative: " << error_integral << std::endl;
 
     // error terms
-    auto proportional_term = kp * error;
-    auto integral_term = ki * error_integral;
-    auto derivative_term = kd * error_derivative;
+    // auto proportional_term = kp * error;
+    // auto integral_term = ki * error_integral;
+    // auto derivative_term = kd * error_derivative;
 
-    std::cout << MAGENTA << "proportional_term: " << proportional_term << std::endl;
-    std::cout << MAGENTA << "integral_term: " << integral_term << std::endl;
-    std::cout << MAGENTA << "derivative_term: " << derivative_term << std::endl;
+    auto c = kp * error + ki * error_integral + kd * error_derivative;
+
+    // std::cout << MAGENTA << "proportional_term: " << proportional_term << std::endl;
+    // std::cout << MAGENTA << "integral_term: " << integral_term << std::endl;
+    // std::cout << MAGENTA << "derivative_term: " << derivative_term << std::endl;
 
     // message to publish
     geometry_msgs::TwistStamped command;
-    command.twist.linear.x = kp * error(0) + ki * error_integral(0) + kd * error_derivative(0);
-    command.twist.linear.y = kp * error(1) + ki * error_integral(1) + kd * error_derivative(1);
-    command.twist.linear.z = kp * error(2) + ki * error_integral(2) + kd * error_derivative(2);
+    command.twist.linear.x = c.x();
+    command.twist.linear.y = c.y();
+    command.twist.linear.z = c.z();
 
     // current error is the previous error for the next time step
     error_previous = error;
@@ -195,6 +237,8 @@ auto main(int argc, char** argv) -> int {
     // velocity publisher
     pub_velocity =
         nh.advertise<geometry_msgs::TwistStamped>("/mavros/setpoint_velocity/cmd_vel", 10);
+
+    pub_waypoints = nh.advertise<visualization_msgs::Marker>("/visualization_marker", 10);
 
     //----------------------------------------------------------------------------------------------
     // arm service client
@@ -265,10 +309,10 @@ auto main(int argc, char** argv) -> int {
                     pub_velocity.publish(command);
 
                     // state change
-                    std::cout << "(*error).norm()" << (*error).norm() << std::endl;
                     if ((*error).norm() < TOLERANCE) {  // within tolerance, change to
-                        // next waypoint
+                        // next waypoint, reset integral error
                         waypoint_idx++;
+                        error_integral = Vector3f(0, 0, 0);
                         // change back to HOVER if all waypoints have been visited
                         if (waypoint_idx >= inspection_waypoints.size()) {
                             inspection_completed = true;
@@ -291,6 +335,9 @@ auto main(int argc, char** argv) -> int {
                     }
                     previous_request_time = ros::Time::now();
                 }
+                break;
+            default:
+                ROS_WARN_STREAM("Unknown state");
                 break;
         }
         //------------------------------------------------------------------------------------------
@@ -329,20 +376,20 @@ auto main(int argc, char** argv) -> int {
         ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "mission:" << RESET);
         ROS_INFO_STREAM("  time:  " << format("%1.2f") %
                                            group(setfill(' '), setw(w + 2), delta_time));
-        ROS_INFO_STREAM("  state: " << format("%1.2f") %
-                                           group(setfill(' '), setw(w), mission_state));
+        ROS_INFO_STREAM("  state: " << format("%1.2f") % group(setfill(' '), setw(w),
+                                                               state_to_string(mission_state)));
         ROS_INFO_STREAM("  index: " << format("%1.2f") %
                                            group(setfill(' '), setw(w), waypoint_idx + 1));
         ROS_INFO_STREAM("  waypoint:");
         ROS_INFO_STREAM(
             "    x: " << format("%1.5f") %
-                             group(setfill(' '), setw(8), inspection_waypoints[waypoint_idx](0)));
+                             group(setfill(' '), setw(8), inspection_waypoints[waypoint_idx].x()));
         ROS_INFO_STREAM(
             "    y: " << format("%1.5f") %
-                             group(setfill(' '), setw(8), inspection_waypoints[waypoint_idx](1)));
+                             group(setfill(' '), setw(8), inspection_waypoints[waypoint_idx].y()));
         ROS_INFO_STREAM(
             "    z: " << format("%1.5f") %
-                             group(setfill(' '), setw(8), inspection_waypoints[waypoint_idx](2)));
+                             group(setfill(' '), setw(8), inspection_waypoints[waypoint_idx].z()));
         //------------------------------------------------------------------------------------------
         // drone position
         ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "position:" << RESET);
@@ -352,12 +399,14 @@ auto main(int argc, char** argv) -> int {
         //------------------------------------------------------------------------------------------
         // position errors
         ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "errors:" << RESET);
-        ROS_INFO_STREAM("  x: " << format("%1.5f") %
-                                       group(setfill(' '), setw(8), error_previous(0)));
-        ROS_INFO_STREAM("  y: " << format("%1.5f") %
-                                       group(setfill(' '), setw(8), error_previous(1)));
-        ROS_INFO_STREAM("  z: " << format("%1.5f") %
-                                       group(setfill(' '), setw(8), error_previous(2)));
+        ROS_INFO_STREAM("  x:    " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), error_previous.x()));
+        ROS_INFO_STREAM("  y:    " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), error_previous.y()));
+        ROS_INFO_STREAM("  z:    " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), error_previous.z()));
+        ROS_INFO_STREAM("  norm: " << format("%1.5f") %
+                                          group(setfill(' '), setw(8), error_previous.norm()));
         //------------------------------------------------------------------------------------------
         // controller outputs
         ROS_INFO_STREAM(GREEN << BOLD << ITALIC << "controller outputs:" << RESET);
