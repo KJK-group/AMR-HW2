@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+	<arg name="package" value="amr-hw2" />
+	<arg name="package_path" value="$(find amr-hw2)" />
+
+	<node pkg="$(arg package)" type="publish_waypoints_in_rviz" name="publish_waypoints_in_rviz" output="screen" />
+	<node pkg="rviz" type="rviz" name="rviz" args="-d $(arg package_path)/rviz/task-1.rviz" />
+</launch>

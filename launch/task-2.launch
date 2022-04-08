@@ -7,8 +7,11 @@
     <arg name="ki" default="1"/>
     <arg name="kd" default="1"/>
 
-    <include file="$(arg package_path)/launch/task-1.launch"/>
+	<include file="$(arg package_path)/launch/inspection.launch" />
+	<include file="$(arg package_path)/launch/waypoints.launch" />
     <node pkg="$(arg package)" type="map_to_odom_tf_broadcaster" name="map_to_odom_tf_broadcaster"/>
+
+    <node pkg="rqt_multiplot" type="rqt_multiplot" name="rqt_multiplot" />
 
     <node
         pkg="$(arg package)"
@@ -26,4 +29,5 @@
         name="mission_state_machine_node"
         args="$(arg kp) $(arg ki) $(arg kd)"
         output="screen" />
+	<node name="rqt_tf_tree" pkg="rqt_tf_tree" type="rqt_tf_tree" />
 </launch>
