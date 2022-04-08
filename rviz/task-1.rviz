@@ -107,7 +107,7 @@ Visualization Manager:
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
-      Color: 0; 0; 255
+      Color: 255; 255; 255
       Enabled: true
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
@@ -133,9 +133,8 @@ Visualization Manager:
       Marker Topic: visualization_marker
       Name: Marker
       Namespaces:
-        arrow/1649409854: true
-        drone_path/1649409866: true
-        sphere/1649409855: true
+        arrow/1649418846: true
+        sphere/1649418846: true
       Queue Size: 100
       Value: true
   Enabled: true
@@ -166,7 +165,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 14.570503234863281
+      Distance: 11.252874374389648
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -174,17 +173,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 4.08703088760376
-        Y: 3.1521127223968506
-        Z: 1.7034910917282104
+        X: 3.433938980102539
+        Y: 2.4000158309936523
+        Z: 2.67551326751709
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.41539889574050903
+      Pitch: 0.2703987956047058
       Target Frame: <Fixed Frame>
-      Yaw: 5.153564929962158
+      Yaw: 5.183604717254639
     Saved: ~
 Window Geometry:
   Displays:
