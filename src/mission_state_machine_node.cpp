@@ -18,20 +18,20 @@
 #include "boost/format.hpp"
 #include "utils/rviz.hpp"
 
-#define TOLERANCE 0.25
-#define TOLERANCE_VELOCITY 0.15
-#define TOLERANCE_ACCELERATION 0.25
+constexpr auto TOLERANCE = 0.25;
+constexpr auto TOLERANCE_VELOCITY = 0.15;
+constexpr auto TOLERANCE_ACCELERATION = 0.25;
 // escape codes
-#define MAGENTA "\u001b[35m"
-#define GREEN "\u001b[32m"
-#define RESET "\u001b[0m"
-#define BOLD "\u001b[1m"
-#define ITALIC "\u001b[3m"
-#define UNDERLINE "\u001b[4m"
+constexpr auto MAGENTA = "\u001b[35m";
+constexpr auto GREEN = "\u001b[32m";
+constexpr auto RESET = "\u001b[0m";
+constexpr auto BOLD = "\u001b[1m";
+constexpr auto ITALIC = "\u001b[3m";
+constexpr auto UNDERLINE = "\u001b[4m";
 // frames
-#define FRAME_WORLD "map"
-#define FRAME_INSPECTION "inspection"
-#define FRAME_BODY "odom"
+constexpr auto FRAME_WORLD = "map";
+constexpr auto FRAME_INSPECTION = "inspection";
+constexpr auto FRAME_BODY = "odom";
 
 using boost::format;
 using boost::io::group;
@@ -208,7 +208,7 @@ auto command_drone(Vector3f error) -> geometry_msgs::TwistStamped {
     // std::cout << MAGENTA << "derivative_term: " << derivative_term << std::endl;
 
     // message to publish
-    geometry_msgs::TwistStamped command;
+    geometry_msgs::TwistStamped command{};
     command.twist.linear.x = c.x();
     command.twist.linear.y = c.y();
     command.twist.linear.z = c.z();
@@ -283,12 +283,12 @@ auto main(int argc, char** argv) -> int {
         rate.sleep();
     }
 
-    ros::Time previous_request_time = ros::Time(0);
+    auto previous_request_time = ros::Time(0);
     // offboard mode message
-    mavros_msgs::SetMode mode_msg;
+    mavros_msgs::SetMode mode_msg{};
     mode_msg.request.custom_mode = "OFFBOARD";
     // arm message
-    mavros_msgs::CommandBool srv;
+    mavros_msgs::CommandBool srv{};
     srv.request.value = true;
 
     //----------------------------------------------------------------------------------------------

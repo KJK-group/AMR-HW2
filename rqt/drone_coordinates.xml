@@ -26,8 +26,8 @@
                         <curve_0>
                             <axes>
                                 <x_axis>
-                                    <field>header/stamp</field>
-                                    <field_type>1</field_type>
+                                    <field>data</field>
+                                    <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
                                         <absolute_minimum>0</absolute_minimum>
@@ -35,8 +35,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/mavros/local_position/odom</topic>
-                                    <type>nav_msgs/Odometry</type>
+                                    <topic>/time_since_start</topic>
+                                    <type>std_msgs/Float64</type>
                                 </x_axis>
                                 <y_axis>
                                     <field>pose/pose/position/x</field>
@@ -77,8 +77,8 @@
                         <curve_1>
                             <axes>
                                 <x_axis>
-                                    <field></field>
-                                    <field_type>1</field_type>
+                                    <field>data</field>
+                                    <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
                                         <absolute_minimum>0</absolute_minimum>
@@ -86,8 +86,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/mavros/local_position/odom</topic>
-                                    <type>nav_msgs/Odometry</type>
+                                    <topic>/time_since_start</topic>
+                                    <type>std_msgs/Float64</type>
                                 </x_axis>
                                 <y_axis>
                                     <field>pose/pose/position/y</field>
@@ -128,8 +128,8 @@
                         <curve_2>
                             <axes>
                                 <x_axis>
-                                    <field></field>
-                                    <field_type>1</field_type>
+                                    <field>data</field>
+                                    <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
                                         <absolute_minimum>0</absolute_minimum>
@@ -137,8 +137,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/mavros/local_position/odom</topic>
-                                    <type>nav_msgs/Odometry</type>
+                                    <topic>/time_since_start</topic>
+                                    <type>std_msgs/Float64</type>
                                 </x_axis>
                                 <y_axis>
                                     <field>pose/pose/position/z</field>
@@ -202,8 +202,8 @@
                         <curve_0>
                             <axes>
                                 <x_axis>
-                                    <field>norm</field>
-                                    <field_type>1</field_type>
+                                    <field>data</field>
+                                    <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
                                         <absolute_minimum>0</absolute_minimum>
@@ -211,8 +211,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/amr_hw2/error</topic>
-                                    <type>amr_hw2/PointNormStamped</type>
+                                    <topic>/time_since_start</topic>
+                                    <type>std_msgs/Float64</type>
                                 </x_axis>
                                 <y_axis>
                                     <field>norm</field>
