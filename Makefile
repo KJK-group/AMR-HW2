@@ -19,7 +19,8 @@ build: ${src_files} ${header_files}
 
 task-1:
 	roslaunch ${package-name} task-1.launch
-
+task-2:
+	roslaunch ${package-name} task-2.launch
 
 format: clang-format
 
@@ -38,4 +39,4 @@ shellharden:
 dev-setup:
 	./scripts/dev-setup.sh
 
-.PHONY: default build format clang-format clang-tidy lint shellharden dev-setup	task-1
+.PHONY: default build format clang-format clang-tidy lint shellharden dev-setup	task-1 task-2

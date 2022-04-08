@@ -14,10 +14,10 @@
 		default="1" />
 	<arg
 		name="ki"
-		default="1" />
+		default="0" />
 	<arg
 		name="kd"
-		default="1" />
+		default="0" />
 
 	<include file="$(arg package_path)/launch/inspection.launch" />
 	<include file="$(arg package_path)/launch/waypoints.launch" />
@@ -29,6 +29,7 @@
 		pkg="$(arg package)"
 		type="time_since_start_publisher"
 		name="time_since_start_publisher" />
+
 
 	<node
 		pkg="rqt_multiplot"
