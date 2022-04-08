@@ -42,7 +42,9 @@ add_ros_executable(mission_state_machine_node
                    src/mission_state_machine_node.cpp)
 add_ros_executable(publish_waypoints_in_rviz src/publish_waypoints_in_rviz.cpp)
 target_sources(publish_waypoints_in_rviz PUBLIC src/transformlistener.cpp)
-
+add_ros_executable(publish_traversed_path_in_rviz
+                   src/publish_traversed_path_in_rviz.cpp)
 # executable scripts
+
 install(PROGRAMS scripts/make_px4_gazebo.sh
         DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
