@@ -23,11 +23,11 @@ auto main(int argc, char* argv[]) -> int {
         ROS_INFO("published path");
         ros::spinOnce();
         spin_rate.sleep();
-        path.poses.clear();
+        // path.poses.clear();
     };
 
-    auto publish_rate = ros::Rate(1);
-    for (;;) {
+    auto publish_rate = ros::Rate(5);
+    while (ros::ok()) {
         publish_rate.sleep();
         publish(path);
     }

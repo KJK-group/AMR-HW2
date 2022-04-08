@@ -226,12 +226,12 @@ auto command_drone(Vector3f error) -> geometry_msgs::TwistStamped {
 //--------------------------------------------------------------------------------------------------
 auto odom_cb(const nav_msgs::Odometry::ConstPtr& msg) -> void {
     odom = *msg;
-    static auto path_msg_gen = utils::rviz::sphere_msg_gen("drone_path");
-    auto path_msg = path_msg_gen(odom.pose.pose);
-    path_msg.color.b = 1.f;
-    path_msg.color.a = 0.5f;
-    pub_waypoints.publish(path_msg);
-    ros::spinOnce();
+    // static auto path_msg_gen = utils::rviz::sphere_msg_gen("drone_path");
+    // auto path_msg = path_msg_gen(odom.pose.pose);
+    // path_msg.color.b = 1.f;
+    // path_msg.color.a = 0.5f;
+    // pub_waypoints.publish(path_msg);
+    // ros::spinOnce();
 }
 auto state_cb(const mavros_msgs::State::ConstPtr& msg) -> void { drone_state = *msg; }
 
