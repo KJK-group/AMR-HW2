@@ -3,13 +3,14 @@
 	<arg name="package" value="amr_hw2" />
 	<arg name="package_path" value="$(find amr_hw2)" />
     <arg name="catkin_ws_path" default="$(optenv SOURCED_WS ~/catkin_ws)"/>
-    <arg name="kp" default="1"/>
-    <arg name="ki" default="1"/>
-    <arg name="kd" default="1"/>
+    <arg name="kp" default="0.5"/>
+    <arg name="ki" default="0"/>
+    <arg name="kd" default="0"/>
 
 	<include file="$(arg package_path)/launch/inspection.launch" />
 	<include file="$(arg package_path)/launch/waypoints.launch" />
     <node pkg="$(arg package)" type="map_to_odom_tf_broadcaster" name="map_to_odom_tf_broadcaster"/>
+    <node pkg="$(arg package)" type="publish_traversed_path_in_rviz" name="publish_traversed_path_in_rviz"/>
 
     <node pkg="rqt_multiplot" type="rqt_multiplot" name="rqt_multiplot" args="--multiplot-config $(arg package_path)/rqt/drone_coordinates.xml --multiplot-run-all" />
 
