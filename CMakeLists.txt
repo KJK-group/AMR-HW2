@@ -25,17 +25,9 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${Eigen3_INCLUDE_DIRS})
 file(GLOB header_files ${CMAKE_SOURCE_DIR}/include/*.hpp
      ${CMAKE_SOURCE_DIR}/include/utils/*.hpp)
 
-add_message_files(
-  DIRECTORY
-  ${CMAKE_CURRENT_SOURCE_DIR}/msg
-  FILES
-  PointNormStamped.msg
-)
-generate_messages(
-  DEPENDENCIES
-  geometry_msgs
-  std_msgs
-)
+add_message_files(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/msg FILES
+                  PointNormStamped.msg)
+generate_messages(DEPENDENCIES geometry_msgs std_msgs)
 
 function(add_ros_executable name main)
   add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${main})
@@ -55,16 +47,12 @@ add_ros_executable(publish_waypoints_in_rviz src/publish_waypoints_in_rviz.cpp)
 target_sources(publish_waypoints_in_rviz PUBLIC src/transformlistener.cpp)
 add_ros_executable(publish_traversed_path_in_rviz
                    src/publish_traversed_path_in_rviz.cpp)
+add_ros_executable(time_since_start_publisher
+                   src/time_since_start_publisher.cpp)
 
 # this needs to be here for rosrun and roslaunch
-catkin_package(
-  CATKIN_DEPENDS
-  std_msgs
-  geometry_msgs
-  message_runtime
-  message_generation
-  roscpp
-)
+catkin_package(CATKIN_DEPENDS std_msgs geometry_msgs message_runtime
+               message_generation roscpp)
 
 # executable scripts
 install(PROGRAMS scripts/make_px4_gazebo.sh
