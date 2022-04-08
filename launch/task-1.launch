@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
-	<arg name="package" value="amr-hw2" />
-	<arg name="package_path" value="$(find amr-hw2)" />
+	<arg name="package" value="amr_hw2" />
+	<arg name="package_path" value="$(find amr_hw2)" />
 
 	<include file="$(arg package_path)/launch/inspection.launch" />
 	<include file="$(arg package_path)/launch/waypoints.launch" />

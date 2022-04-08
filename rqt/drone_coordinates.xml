@@ -27,7 +27,7 @@
                             <axes>
                                 <x_axis>
                                     <field>header/stamp</field>
-                                    <field_type>0</field_type>
+                                    <field_type>1</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
                                         <absolute_minimum>0</absolute_minimum>
@@ -77,8 +77,8 @@
                         <curve_1>
                             <axes>
                                 <x_axis>
-                                    <field>header/stamp</field>
-                                    <field_type>0</field_type>
+                                    <field></field>
+                                    <field_type>1</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
                                         <absolute_minimum>0</absolute_minimum>
@@ -128,8 +128,8 @@
                         <curve_2>
                             <axes>
                                 <x_axis>
-                                    <field>header/stamp</field>
-                                    <field_type>0</field_type>
+                                    <field></field>
+                                    <field_type>1</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
                                         <absolute_minimum>0</absolute_minimum>
@@ -202,8 +202,8 @@
                         <curve_0>
                             <axes>
                                 <x_axis>
-                                    <field></field>
-                                    <field_type>0</field_type>
+                                    <field>norm</field>
+                                    <field_type>1</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
                                         <absolute_minimum>0</absolute_minimum>
@@ -211,11 +211,11 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/amr-hw2/error/distance</topic>
-                                    <type></type>
+                                    <topic>/amr_hw2/error</topic>
+                                    <type>amr_hw2/PointNormStamped</type>
                                 </x_axis>
                                 <y_axis>
-                                    <field></field>
+                                    <field>norm</field>
                                     <field_type>0</field_type>
                                     <scale>
                                         <absolute_maximum>1000</absolute_maximum>
@@ -224,8 +224,8 @@
                                         <relative_minimum>-1000</relative_minimum>
                                         <type>0</type>
                                     </scale>
-                                    <topic>/amr-hw2/error/distance</topic>
-                                    <type></type>
+                                    <topic>/amr_hw2/error</topic>
+                                    <type>amr_hw2/PointNormStamped</type>
                                 </y_axis>
                             </axes>
                             <color>
@@ -240,7 +240,7 @@
                             <style>
                                 <lines_interpolate>false</lines_interpolate>
                                 <pen_style>1</pen_style>
-                                <pen_width>2</pen_width>
+                                <pen_width>1</pen_width>
                                 <render_antialias>false</render_antialias>
                                 <steps_invert>false</steps_invert>
                                 <sticks_baseline>0</sticks_baseline>
@@ -255,7 +255,7 @@
                         <visible>true</visible>
                     </legend>
                     <plot_rate>30</plot_rate>
-                    <title>Distance error</title>
+                    <title>Distance Error</title>
                 </column_1>
             </row_0>
         </plots>

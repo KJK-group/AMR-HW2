@@ -7,7 +7,7 @@ MAKEFLAGS += --no-builtin-rules
 MAKEFLAGS += --no-silent
 
 
-package-name := amr-hw2
+package-name := amr_hw2
 
 default: build
 

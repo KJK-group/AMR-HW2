@@ -1,5 +1,5 @@
-#ifndef _AMR - HW2_TRANSFORMLISTENER_HPP_
-#define _AMR -HW2_TRANSFORMLISTENER_HPP_
+#ifndef _AMR_HW2_TRANSFORMLISTENER_HPP_
+#define _AMR_HW2_TRANSFORMLISTENER_HPP_
 
 #include <ros/ros.h>
 #include <tf2/utils.h>
@@ -26,7 +26,6 @@ class TransformListener {
    private:
     tf2_ros::Buffer buffer = {};
     tf2_ros::TransformListener listener = {buffer};
-
 };
 }  // namespace utils::transform
 

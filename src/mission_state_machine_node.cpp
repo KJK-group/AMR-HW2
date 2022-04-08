@@ -14,12 +14,13 @@
 #include <optional>
 #include <vector>
 
+#include "amr_hw2/PointNormStamped.h"
 #include "boost/format.hpp"
 #include "utils/rviz.hpp"
 
-#define TOLERANCE 0.1
-#define TOLERANCE_VELOCITY 0.1
-#define TOLERANCE_ACCELERATION 0.2
+#define TOLERANCE 0.25
+#define TOLERANCE_VELOCITY 0.15
+#define TOLERANCE_ACCELERATION 0.25
 // escape codes
 #define MAGENTA "\u001b[35m"
 #define GREEN "\u001b[32m"
@@ -67,6 +68,7 @@ state mission_state = PASSIVE;
 // publishers
 ros::Publisher pub_velocity;
 ros::Publisher pub_waypoints;
+ros::Publisher pub_error;
 
 // subscribers
 ros::Subscriber sub_state;
@@ -92,6 +94,7 @@ auto kd = 1.f;
 
 // sequence counters
 auto seq_tf = 0;
+auto seq_error = 0;
 
 // waypoints
 auto hover_waypoint = Vector3f(0, 0, 2);
@@ -262,8 +265,8 @@ auto main(int argc, char** argv) -> int {
     // velocity publisher
     pub_velocity =
         nh.advertise<geometry_msgs::TwistStamped>("/mavros/setpoint_velocity/cmd_vel", 10);
-
     pub_waypoints = nh.advertise<visualization_msgs::Marker>("/visualization_marker", 10);
+    pub_error = nh.advertise<amr_hw2::PointNormStamped>("/amr_hw2/error", 10);
 
     //----------------------------------------------------------------------------------------------
     // arm service client
@@ -368,6 +371,17 @@ auto main(int argc, char** argv) -> int {
                 ROS_WARN_STREAM("Unknown state");
                 break;
         }
+
+        // publish custom error msg for plotting
+        amr_hw2::PointNormStamped error_msg;
+        error_msg.header.seq = seq_error++;
+        error_msg.header.stamp = ros::Time::now();
+        error_msg.point.x = error_previous.x();
+        error_msg.point.y = error_previous.y();
+        error_msg.point.z = error_previous.z();
+        error_msg.norm = error_previous.norm();
+        pub_error.publish(error_msg);
+
         //------------------------------------------------------------------------------------------
         // request to set drone mode to OFFBOARD every 5 seconds until drone is in OFFBOARD mode
         if (drone_state.mode != "OFFBOARD" &&

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(amr-hw2)
+project(amr_hw2)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,9 +8,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 # dependencies
 find_package(
   catkin REQUIRED
-  COMPONENTS geometry_msgs
+  COMPONENTS std_msgs
+             geometry_msgs
              nav_msgs
              mavros_msgs
+             message_generation
              roscpp
              tf2
              tf2_ros
@@ -23,8 +25,17 @@ include_directories(include ${catkin_INCLUDE_DIRS} ${Eigen3_INCLUDE_DIRS})
 file(GLOB header_files ${CMAKE_SOURCE_DIR}/include/*.hpp
      ${CMAKE_SOURCE_DIR}/include/utils/*.hpp)
 
-# this needs to be here for rosrun and roslaunch
-catkin_package()
+add_message_files(
+  DIRECTORY
+  ${CMAKE_CURRENT_SOURCE_DIR}/msg
+  FILES
+  PointNormStamped.msg
+)
+generate_messages(
+  DEPENDENCIES
+  geometry_msgs
+  std_msgs
+)
 
 function(add_ros_executable name main)
   add_executable(${name} ${CMAKE_CURRENT_SOURCE_DIR}/${main})
@@ -42,6 +53,16 @@ add_ros_executable(mission_state_machine_node
                    src/mission_state_machine_node.cpp)
 add_ros_executable(publish_waypoints_in_rviz src/publish_waypoints_in_rviz.cpp)
 target_sources(publish_waypoints_in_rviz PUBLIC src/transformlistener.cpp)
+
+# this needs to be here for rosrun and roslaunch
+catkin_package(
+  CATKIN_DEPENDS
+  std_msgs
+  geometry_msgs
+  message_runtime
+  message_generation
+  roscpp
+)
 
 # executable scripts
 install(PROGRAMS scripts/make_px4_gazebo.sh

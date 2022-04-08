@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
-	<arg name="package" value="amr-hw2" />
-	<arg name="package_path" value="$(find amr-hw2)" />
+	<arg name="package" value="amr_hw2" />
+	<arg name="package_path" value="$(find amr_hw2)" />
 
 	<node pkg="$(arg package)" type="crane_pose_publisher" name="crane_pose_publisher" output="screen" />
 	<node pkg="$(arg package)" type="map_to_inspection_tf_broadcaster" name="map_to_inspection_tf_broadcaster" output="screen" />

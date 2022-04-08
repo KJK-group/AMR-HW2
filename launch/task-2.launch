@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
-	<arg name="package" value="amr-hw2" />
-	<arg name="package_path" value="$(find amr-hw2)" />
+	<arg name="package" value="amr_hw2" />
+	<arg name="package_path" value="$(find amr_hw2)" />
     <arg name="catkin_ws_path" default="$(optenv SOURCED_WS ~/catkin_ws)"/>
     <arg name="kp" default="1"/>
     <arg name="ki" default="1"/>
@@ -11,7 +11,7 @@
 	<include file="$(arg package_path)/launch/waypoints.launch" />
     <node pkg="$(arg package)" type="map_to_odom_tf_broadcaster" name="map_to_odom_tf_broadcaster"/>
 
-    <node pkg="rqt_multiplot" type="rqt_multiplot" name="rqt_multiplot" />
+    <node pkg="rqt_multiplot" type="rqt_multiplot" name="rqt_multiplot" args="--multiplot-config $(arg package_path)/rqt/drone_coordinates.xml --multiplot-run-all" />
 
     <node
         pkg="$(arg package)"
